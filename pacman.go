@@ -64,18 +64,33 @@ func NewEffect(effect string) Effect {
 func (p Pacman) Apply(e Effect) (interface{}, error) {
 	switch e.effectType {
 	case StartType:
-		return p.applyStart(e)
+		return p.applyStart(e, false)
 	case StartEndType:
-		return p.applyStartEnd(e)
+		return p.applyStartEnd(e, false)
 	case StartEndStepType:
-		return p.applyStartEndStep(e)
+		return p.applyStartEndStep(e, false)
 	default:
 		return nil, fmt.Errorf("Effect not valid: unknown type \"%s\"", reflect.TypeOf(e.effectType))
 	}
 
 }
 
-func (p Pacman) applyStart(e Effect) (interface{}, error) {
+// ApplyUnbounded applies the effect to the slice as if it is unbounded
+func (p Pacman) ApplyUnbounded(e Effect) (interface{}, error) {
+	switch e.effectType {
+	case StartType:
+		return p.applyStart(e, true)
+	case StartEndType:
+		return p.applyStartEnd(e, true)
+	case StartEndStepType:
+		return p.applyStartEndStep(e, true)
+	default:
+		return nil, fmt.Errorf("Effect not valid: unknown type \"%s\"", reflect.TypeOf(e.effectType))
+	}
+
+}
+
+func (p Pacman) applyStart(e Effect, unbounded bool) (interface{}, error) {
 	start, err := strconv.Atoi(e.start)
 	if err != nil {
 		return nil, err
@@ -84,43 +99,46 @@ func (p Pacman) applyStart(e Effect) (interface{}, error) {
 	switch reflect.TypeOf(p.slice).Kind() {
 	case reflect.Slice:
 		s := reflect.ValueOf(p.slice)
-		len := s.Len()
-		if start >= 0 {
-			return s.Index(start).Interface(), nil
+		l := s.Len()
+		k := start
+		if unbounded {
+			k = k % l
 		}
-		return s.Index(len + start).Interface(), nil
+		if k >= 0 {
+			return s.Index(k).Interface(), nil
+		}
+		return s.Index(l + k).Interface(), nil
 	default:
 		return nil, fmt.Errorf("Invalid slice: \"%s\" is not a slice", reflect.TypeOf(p.slice))
 	}
 
 }
 
-func (p Pacman) applyStartEnd(e Effect) (interface{}, error) {
+func (p Pacman) applyStartEnd(e Effect, unbounded bool) (interface{}, error) {
 	switch reflect.TypeOf(p.slice).Kind() {
 	case reflect.Slice:
 		s := reflect.ValueOf(p.slice)
 		len := s.Len()
-		start, err := getOrDefault(e.start, 0)
+		start, _, err := getOrDefault(e.start, 0)
 		if err != nil {
 			return nil, err
 		}
 
-		end, err := getOrDefault(e.end, len)
+		end, isEndDef, err := getOrDefault(e.end, len)
 		if err != nil {
 			return nil, err
 		}
 
-		if start < 0 {
-			start = len + start
-		}
-		if end < 0 {
-			end = len + end
+		if !unbounded {
+			if start < 0 {
+				start = len + start
+			}
+			if !isEndDef && end < 0 {
+				end = len + end
+			}
 		}
 
-		start = max(0, start)
-		end = min(len, end)
-
-		res := applySlice(p.slice, start, end, 1)
+		res := applySlice(p.slice, start, end, 1, unbounded)
 
 		return res, nil
 	default:
@@ -128,37 +146,43 @@ func (p Pacman) applyStartEnd(e Effect) (interface{}, error) {
 	}
 }
 
-func (p Pacman) applyStartEndStep(e Effect) (interface{}, error) {
+func (p Pacman) applyStartEndStep(e Effect, unbounded bool) (interface{}, error) {
 	switch reflect.TypeOf(p.slice).Kind() {
 	case reflect.Slice:
 		s := reflect.ValueOf(p.slice)
-		len := s.Len()
-		start, err := getOrDefault(e.start, 0)
+		l := s.Len()
+		start, _, err := getOrDefault(e.start, 0)
 		if err != nil {
 			return nil, err
 		}
 
-		end, err := getOrDefault(e.end, len)
+		step, _, err := getOrDefault(e.step, 1)
 		if err != nil {
 			return nil, err
 		}
 
-		step, err := getOrDefault(e.step, 1)
+		var endDefault int
+		if step > 0 {
+			endDefault = l
+		} else {
+			endDefault = -1
+		}
+
+		end, isEndDef, err := getOrDefault(e.end, endDefault)
 		if err != nil {
 			return nil, err
 		}
 
-		if start < 0 {
-			start = len + start
-		}
-		if end < 0 {
-			end = len + end
+		if !unbounded {
+			if start < 0 {
+				start = l + start
+			}
+			if !isEndDef && end < 0 {
+				end = l + end
+			}
 		}
 
-		start = max(0, start)
-		end = min(len, end)
-
-		res := applySlice(p.slice, start, end, step)
+		res := applySlice(p.slice, start, end, step, unbounded)
 
 		return res, nil
 	default:
@@ -166,19 +190,28 @@ func (p Pacman) applyStartEndStep(e Effect) (interface{}, error) {
 	}
 }
 
-func applySlice(slice interface{}, start, end, step int) interface{} {
+func applySlice(slice interface{}, start, end, step int, unbounded bool) interface{} {
 	sliceType := reflect.TypeOf(slice)
 	sliceValue := reflect.ValueOf(slice)
+	l := sliceValue.Len()
 
 	res := reflect.MakeSlice(sliceType, 0, 0)
-	if step == 0 { //|| (step > 0 && start >= end) || (step < 0 && start <= end) {
+	if step == 0 {
 		return res.Interface()
 	}
 
 	cond := getLoopCondition(end, step)
 
 	for i := start; cond(i); i = i + step {
-		res = reflect.Append(res, sliceValue.Index(i))
+
+		if unbounded || (i >= 0 && i < l) {
+			k := i % l
+			if k < 0 {
+				res = reflect.Append(res, sliceValue.Index(l+k))
+			} else {
+				res = reflect.Append(res, sliceValue.Index(k))
+			}
+		}
 	}
 
 	return res.Interface()
@@ -195,23 +228,10 @@ func getLoopCondition(lim, step int) func(int) bool {
 	}
 }
 
-func max(x, y int) int {
-	if x < y {
-		return y
-	}
-	return x
-}
-
-func min(x, y int) int {
-	if x > y {
-		return y
-	}
-	return x
-}
-
-func getOrDefault(s string, def int) (int, error) {
+func getOrDefault(s string, def int) (int, bool, error) {
 	if s == "" {
-		return def, nil
+		return def, true, nil
 	}
-	return strconv.Atoi(s)
+	res, err := strconv.Atoi(s)
+	return res, false, err
 }
