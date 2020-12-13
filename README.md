@@ -15,6 +15,7 @@ The default values are defined as follows:
 * The default value for *step* is 1.
 
 This library uses a *colon-separated string* to define the three params. The three params can be omitted by leaving their position empty; in this case, the default value will be used for the omitted param.
+
 The slice notation returns a single element when only the *start* param is retrieved, while it returns a slice if at least the *end* parameter is available (also as default, e.g. if the string contains at least one colon character).
 
 Here you can find some examples written in Python:
@@ -39,38 +40,43 @@ To use this library you need to import 'github.com/Valmoz/pacmaneffect'
 To use this library, you must define a **Pacman** instance as follows:
 ```go
 arr := []int{1, 2, 3, 4, 5}
-p, _ := NewPacman(arr)
+p, _ := pacmaneffect.NewPacman(arr)
 ```
 Pacman accepts *interface{}* as input, so you can use every type of slice.
 To retrieve the result, you need to provide an **Effect** as follows:
 ```go
-e := NewEffect("0:5:2")
+e := pacmaneffect.NewEffect("0:5:2")
 result, _ := p.Apply(e)
 ```
 
 This library implements two main functionalities called *Apply* and *ApplyUnbounded*.
 
 The *Apply* method implements the same behavior defined by Python's slice notation. The accepted range of accepted indexes is [-length, length - 1], where "length" is the length of the array.
+
 If the provided parameters try to retrieve and index outside these bounds, the index is just ignored.
 Only in the case of single element retrieval (e.g. a string without colons), if an index outside these borders is used as input for Apply then an error is returned.
+
 For example:
 ```go
-p, _ := NewPacman([]int{1, 2, 3, 4, 5})
-result, _ := p.Apply(NewEffect("-10:10")) // result = []int{1, 2, 3, 4, 5}
-_, err := p.Apply(NewEffect("-10"))       // An error is returned
+p, _ := pacmaneffect.NewPacman([]int{1, 2, 3, 4, 5})
+result, _ := p.Apply(pacmaneffect.NewEffect("-10:10")) // result = []int{1, 2, 3, 4, 5}
+_, err := p.Apply(pacmaneffect.NewEffect("-10"))       // An error is returned
 ```
 
 The *ApplyUnbounded* method is slightly different because it accepts even indexes outside these borders: for every index, the result of *Modulus* (i % length) is used. 
+
 In this way, the array becomes theoretically infinite on both sides. This feature also makes it possible to take every element of the original array multiple times, appending the array to itself.
+
 Obviously, ApplyUnbounded doesn't return an error if *start* is outside borders in the single element retrieval.
 For example:
 ```go
-p, _ := NewPacman([]int{1, 2, 3, 4, 5})
-result, _ := p.ApplyUnbounded(NewEffect("-10:10")) // result = []int{1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5}
-result2, _ := p.Apply(NewEffect("-10"))            // result2 = 1
+p, _ := pacmaneffect.NewPacman([]int{1, 2, 3, 4, 5})
+result, _ := p.ApplyUnbounded(pacmaneffect.NewEffect("-10:10")) // result = []int{1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5}
+result2, _ := p.Apply(pacmaneffect.NewEffect("-10"))            // result2 = 1
 ```
 
 The two methods described above can be used with every type of slice. Since Go doesn't support Generics (yet), *reflect* was used to make it possible; this introduces a slight deterioration of the functionality performances.
+
 If performance is a key factor for your application, then you can use one of the following methods designed for the basic slice types:
 * []string: *ApplyString* and *ApplyUnboundedString*
 * []int: *ApplyInt* and *ApplyUnboundedInt*
@@ -81,12 +87,13 @@ If performance is a key factor for your application, then you can use one of the
 * []float32: *ApplyFloat32* and *ApplyFloat32*
 
 These methods can be used exactly as described above. The result is always of type *interface{}*, to make it possible to return a single element or a slice based on the provided input.
+
 For example:
 ```go
-p, _ := NewPacman([]string{"1", "2", "3", "4", "5"})
-result, _ := p.ApplyString(NewEffect("3:")) 
+p, _ := pacmaneffect.NewPacman([]string{"1", "2", "3", "4", "5"})
+result, _ := p.ApplyString(pacmaneffect.NewEffect("3:")) 
 resultStr := result.([]string)              // resultStr = []string{"4", "5"}
-result2, _ := p.ApplyString(NewEffect("2"))       
+result2, _ := p.ApplyString(pacmaneffect.NewEffect("2"))       
 result2Str := result2.(string)              // result2Str = "2"
 ```
 
