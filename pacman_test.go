@@ -125,6 +125,10 @@ func TestPacmanApply(t *testing.T) {
 
 	testApply(t, *p, "0:4:0", []int{}, "Test 55")
 
+	testApply(t, *p, "::-1", []int{5, 4, 3, 2, 1}, "Test 56")
+
+	testApply(t, *p, "-10:10", []int{1, 2, 3, 4, 5}, "Test 57")
+
 	map1 := map[string]int{
 		"a": 1,
 		"b": 2,
@@ -251,6 +255,12 @@ func TestPacmanApplyUnbounded(t *testing.T) {
 	testApplyUnbounded(t, *p, "3:-1:-1", []int{4, 3, 2, 1}, "Test Unbounded 53")
 
 	testApplyUnbounded(t, *p, "6::-1", []int{2, 1, 5, 4, 3, 2, 1}, "Test Unbounded 54")
+
+	testApplyUnbounded(t, *p, "0:4:0", []int{}, "Test Unbounded 55")
+
+	testApplyUnbounded(t, *p, "::-1", []int{5, 4, 3, 2, 1}, "Test Unbounded 56")
+
+	testApplyUnbounded(t, *p, "-10:10", []int{1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5}, "Test Unbounded 57")
 
 	map1 := map[string]int{
 		"a": 1,

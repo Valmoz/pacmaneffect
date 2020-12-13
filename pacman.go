@@ -883,12 +883,19 @@ func applySliceFloat32(slice []float32, start, end, step int, unbounded bool) []
  */
 
 func getLoopParams(e Effect, length int, unbounded bool) (int, int, int, error) {
-	start, _, err := getOrDefault(e.start, 0)
+	step, _, err := getOrDefault(e.step, 1)
 	if err != nil {
 		return 0, 0, 0, err
 	}
 
-	step, _, err := getOrDefault(e.step, 1)
+	var startDefault int
+	if step > 0 {
+		startDefault = 0
+	} else {
+		startDefault = length - 1
+	}
+
+	start, _, err := getOrDefault(e.start, startDefault)
 	if err != nil {
 		return 0, 0, 0, err
 	}
